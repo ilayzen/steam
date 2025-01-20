@@ -6,8 +6,15 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+)
+
+const (
+	SteamcommunityURL = "https://steamcommunity.com/"
 )
 
 const (
@@ -53,6 +60,49 @@ const (
 	CurrencyUYU = "41"
 	CurrencyRMB = "9000"
 )
+
+var WalletMap = map[string]string{
+	"$":    "1",  // USD
+	"£":    "2",  // GBP
+	"€":    "3",  // EUR
+	"CHF":  "4",  // CHF
+	"₽":    "5",  // RUB
+	"zł":   "6",  // PLN
+	"R$":   "7",  // BRL
+	"¥":    "8",  // JPY
+	"kr":   "9",  // NOK
+	"Rp":   "10", // IDR
+	"RM":   "11", // MYR
+	"₱":    "12", // PHP
+	"S$":   "13", // SGD
+	"฿":    "14", // THB
+	"₫":    "15", // VND
+	"₩":    "16", // KRW
+	"₺":    "17", // TRY
+	"₴":    "18", // UAH
+	"Mex$": "19", // MXN
+	"CAD":  "20", // CAD
+	"AUD":  "21", // AUD
+	"NZ$":  "22", // NZD
+	"元":    "23", //CNY
+	"₹":    "24", // INR
+	"CLP$": "25", // CLP
+	"S/":   "26", // PEN
+	"COP$": "27", // COP
+	"R":    "28", // ZAR
+	"HK$":  "29", // HKD
+	"NT$":  "30", // TWD
+	"ر.س":  "31", // SAR
+	"د.إ":  "32", // AED
+	"₪":    "35", // ILS
+	"Br":   "36", // BYN
+	"₸":    "37", // KZT
+	"KWD":  "38", // KWD
+	"QAR":  "39", // QAR
+	"₡":    "40", // CRC
+	"UYU$": "41", // UYU
+	"RMB":  "23", // RMB
+}
 
 type MarketItemPriceOverview struct {
 	Success     bool   `json:"success"`
@@ -293,4 +343,59 @@ func (session *Session) CancelBuyOrder(orderid uint64) error {
 	}
 
 	return nil
+}
+
+func (session *Session) GetWallet() (string, error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, SteamcommunityURL, nil)
+	if err != nil {
+		return "", err
+	}
+
+	parsedURL, err := url.Parse(SteamcommunityURL)
+	if err != nil {
+		return "", err
+	}
+
+	for _, v := range session.client.Jar.Cookies(parsedURL) {
+		if v.Name == "steamLoginSecure" {
+			req.Header.Set("Cookie", v.String())
+		}
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	wallet := ""
+	doc.Find(".responsive_menu_user_wallet").Each(func(i int, s *goquery.Selection) {
+		wallet = s.Find("b").Text()
+	})
+
+	return wallet, nil
+}
+
+func (session *Session) CleanPrice(price string) (string, string, string) {
+	currencyRe := regexp.MustCompile(`[^\p{L}\p{Sc}]`)
+	currencySymbol := strings.TrimSpace(currencyRe.ReplaceAllString(price, ""))
+
+	numericRe := regexp.MustCompile(`[^\d,.]`)
+	cleanedPrice := numericRe.ReplaceAllString(price, "")
+
+	cleanedPrice = strings.ReplaceAll(cleanedPrice, " ", "")
+	cleanedPrice = strings.TrimSpace(cleanedPrice)
+
+	currencyID := ""
+	if id, found := WalletMap[currencySymbol]; found {
+		currencyID = id
+	}
+
+	return cleanedPrice, currencySymbol, currencyID
 }
