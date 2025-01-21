@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -379,6 +380,10 @@ func (session *Session) GetWallet() (string, error) {
 		wallet = s.Find("b").Text()
 	})
 
+	if wallet == "" {
+		return "", fmt.Errorf("failed to get wallet")
+	}
+
 	return wallet, nil
 }
 
@@ -398,4 +403,60 @@ func (session *Session) CleanPrice(price string) (string, string, string) {
 	}
 
 	return cleanedPrice, currencySymbol, currencyID
+}
+
+func (session *Session) GetMyListingsItems() (*ListingItem, error) {
+	client := &http.Client{}
+	parsedURL, err := url.Parse(SteamcommunityURL)
+	if err != nil {
+		return nil, err
+	}
+
+	var allListings ListingItem
+	start := 0
+	count := 100
+	totalCount := -1
+
+	for {
+		req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/market/mylistings?start=%d&count=%d&norender=1", SteamcommunityURL, start, count), nil)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, v := range session.client.Jar.Cookies(parsedURL) {
+			if v.Name == "steamLoginSecure" {
+				req.Header.Set("Cookie", v.String())
+			}
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, err
+		}
+
+		var response ListingItem
+		if err := json.Unmarshal(body, &response); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal json: %v", err)
+		}
+
+		if totalCount == -1 {
+			totalCount = response.TotalCount
+		}
+
+		allListings.Listings = append(allListings.Listings, response.Listings...)
+
+		if len(allListings.Listings) >= totalCount {
+			break
+		}
+
+		start += count
+	}
+
+	return &allListings, nil
 }

@@ -3,7 +3,6 @@ package steam
 import (
 	"bytes"
 	"errors"
-	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/url"
@@ -29,16 +28,8 @@ func (session *Session) Auth(realm, return_to string) (*http.Response, error) {
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
 	req.Header.Add("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/51.0.2704.103 Safari/537.36")
 	req.Header.Add("Accept", "*/*")
-	//req.Header.Add()
 
 	resp, err := session.client.Do(req)
-
-	//out, err := os.Create("login.html")
-	//io.Copy(out, resp.Body)
-	//out.Close()
-
-	fmt.Println(resp.Header["Set-Cookie"])
-	fmt.Println(resp.Request.Header["Cookie"])
 
 	if err != nil {
 		return nil, err
