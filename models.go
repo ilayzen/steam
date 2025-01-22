@@ -38,7 +38,7 @@ type Asset struct {
 	MarketName                  string        `json:"market_name"`
 	MarketHashName              string        `json:"market_hash_name"`
 	Commodity                   uint64        `json:"commodity"`
-	MarketTradableRestriction   uint64        `json:"market_tradable_restriction"`
+	MarketTradableRestriction   int           `json:"market_tradable_restriction"`
 	MarketMarketableRestriction uint64        `json:"market_marketable_restriction"`
 	Marketable                  uint64        `json:"marketable"`
 	AppIcon                     string        `json:"app_icon"`
@@ -110,4 +110,54 @@ type Context struct {
 	AssetCount uint64 `json:"asset_count"`
 	ID         string `json:"id"`
 	Name       string `json:"name"`
+}
+
+type SearchData struct {
+	Query              string `json:"query"`
+	SearchDescriptions bool   `json:"search_descriptions"`
+	TotalCount         uint64 `json:"total_count"`
+	PageSize           uint64 `json:"pagesize"`
+	Prefix             string `json:"prefix"`
+	ClassPrefix        string `json:"class_prefix"`
+}
+
+type AssetDescription struct {
+	AppID                       uint64 `json:"appid"`
+	ClassID                     string `json:"classid"`
+	InstanceID                  string `json:"instanceid"`
+	Currency                    uint64 `json:"currency"`
+	BackgroundColor             string `json:"background_color"`
+	IconURL                     string `json:"icon_url"`
+	IconURLLarge                string `json:"icon_url_large"`
+	Tradable                    uint64 `json:"tradable"`
+	Name                        string `json:"name"`
+	NameColor                   string `json:"name_color"`
+	Type                        string `json:"type"`
+	MarketName                  string `json:"market_name"`
+	MarketHashName              string `json:"market_hash_name"`
+	Commodity                   uint64 `json:"commodity"`
+	MarketTradableRestriction   int    `json:"market_tradable_restriction"`
+	MarketMarketableRestriction uint64 `json:"market_marketable_restriction"`
+	Marketable                  uint64 `json:"marketable"`
+}
+
+type MarketItem struct {
+	Name             string           `json:"name"`
+	HashName         string           `json:"hash_name"`
+	SellListings     int              `json:"sell_listings"`
+	SellPrice        int              `json:"sell_price"`
+	SellPriceText    string           `json:"sell_price_text"`
+	AppIcon          string           `json:"app_icon"`
+	AppName          string           `json:"app_name"`
+	AssetDescription AssetDescription `json:"asset_description"`
+	SalePriceText    string           `json:"sale_price_text"`
+}
+
+type SteamMarketItems struct {
+	Success    bool         `json:"success"`
+	Start      int          `json:"start"`
+	PageSize   int          `json:"pagesize"`
+	TotalCount int          `json:"total_count"`
+	SearchData SearchData   `json:"searchdata"`
+	MarketItem []MarketItem `json:"results"`
 }

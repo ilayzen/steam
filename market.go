@@ -4,19 +4,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/PuerkitoBio/goquery"
 	"io"
 	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
-
-	"github.com/PuerkitoBio/goquery"
 )
 
 const (
 	SteamcommunityURL = "https://steamcommunity.com/"
 )
+
+const marketEndpoint = "%smarket/search/render/?norender=1&start=%d&count=%d"
 
 const (
 	CurrencyUSD = "1"
@@ -459,4 +460,38 @@ func (session *Session) GetMyListingsItems() (*ListingItem, error) {
 	}
 
 	return &allListings, nil
+}
+
+func (s *Session) GetMarketItems(start, perPage uint64) (*SteamMarketItems, error) {
+	if s.client == nil {
+		return nil, fmt.Errorf("HTTP client is not initialized")
+	}
+
+	url := fmt.Sprintf(marketEndpoint, SteamcommunityURL, start, perPage)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("request execution failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	var marketItems SteamMarketItems
+	if err := json.Unmarshal(body, &marketItems); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal JSON: %w", err)
+	}
+
+	return &marketItems, nil
 }
