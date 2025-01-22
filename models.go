@@ -89,3 +89,25 @@ type Action struct {
 	Link string `json:"link"`
 	Name string `json:"name"`
 }
+
+type SteamInventoryContext map[string]GameContext
+
+type GameContext struct {
+	AppID         uint64             `json:"appid"`
+	Name          string             `json:"name"`
+	Icon          string             `json:"icon"`
+	Link          string             `json:"link"`
+	AssetCount    uint64             `json:"asset_count"`
+	InventoryLogo string             `json:"inventory_logo,omitempty"`
+	TradePerms    string             `json:"trade_permissions"`
+	LoadFailed    uint64             `json:"load_failed"`
+	StoreVetted   string             `json:"store_vetted"`
+	OwnerOnly     bool               `json:"owner_only"`
+	RGContexts    map[string]Context `json:"rgContexts"`
+}
+
+type Context struct {
+	AssetCount uint64 `json:"asset_count"`
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+}

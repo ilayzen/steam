@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -223,4 +225,39 @@ func (session *Session) GetInventoryAppStats(sid SteamID) (map[string]InventoryA
 	}
 
 	return inven, nil
+}
+
+func GetInventoryContext(steamID string) (*SteamInventoryContext, error) {
+	client := &http.Client{}
+
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://steamcommunity.com/profiles/%s/inventory/", steamID), nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create a request, err: %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get html page, err: %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read html page, err: %v", err)
+	}
+
+	re := regexp.MustCompile(`g_rgAppContextData\s*=\s*(\{.*?\});`)
+	match := re.FindStringSubmatch(string(body))
+
+	if len(match) < 2 {
+		return nil, fmt.Errorf("cannot get g_rgAppContextData in html page")
+	}
+
+	invContext := &SteamInventoryContext{}
+	err = json.Unmarshal([]byte(match[1]), invContext)
+	if err != nil {
+		return nil, fmt.Errorf("failed to unmarshal json, err %v", err)
+	}
+
+	return invContext, nil
 }
