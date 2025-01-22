@@ -13,7 +13,8 @@ import (
 )
 
 const (
-	InventoryEndpoint = "http://steamcommunity.com/inventory/%d/%d/%d?"
+	InventoryEndpoint        = "http://steamcommunity.com/inventory/%d/%d/%d?"
+	contextInventoryEndpoint = "profiles/%s/inventory/"
 )
 
 type ItemTag struct {
@@ -227,19 +228,21 @@ func (session *Session) GetInventoryAppStats(sid SteamID) (map[string]InventoryA
 	return inven, nil
 }
 
-func GetInventoryContext(steamID string) (*SteamInventoryContext, error) {
-	client := &http.Client{}
-
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://steamcommunity.com/profiles/%s/inventory/", steamID), nil)
+func (session *Session) GetInventoryContext(steamID string) (*SteamInventoryContext, error) {
+	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf(SteamcommunityURL+contextInventoryEndpoint, steamID), nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create a request, err: %v", err)
 	}
 
-	resp, err := client.Do(req)
+	resp, err := session.client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get html page, err: %v", err)
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -253,11 +256,11 @@ func GetInventoryContext(steamID string) (*SteamInventoryContext, error) {
 		return nil, fmt.Errorf("cannot get g_rgAppContextData in html page")
 	}
 
-	invContext := &SteamInventoryContext{}
-	err = json.Unmarshal([]byte(match[1]), invContext)
-	if err != nil {
+	var invContext SteamInventoryContext
+	if err := json.Unmarshal([]byte(match[1]), &invContext); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json, err %v", err)
+
 	}
 
-	return invContext, nil
+	return &invContext, nil
 }
