@@ -19,7 +19,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/0xAozora/steam/pb"
+	"github.com/ilayzen/steam/pb"
 	"google.golang.org/protobuf/proto"
 )
 
