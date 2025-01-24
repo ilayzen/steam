@@ -252,6 +252,10 @@ func (session *Session) GetInventoryContext(steamID string) (*SteamInventoryCont
 	re := regexp.MustCompile(`g_rgAppContextData\s*=\s*(\{.*?\});`)
 	match := re.FindStringSubmatch(string(body))
 
+	if len(match) == 0 {
+		return nil, fmt.Errorf("inventory context is empty")
+	}
+
 	if len(match) < 2 {
 		return nil, fmt.Errorf("cannot get g_rgAppContextData in html page")
 	}
@@ -259,7 +263,6 @@ func (session *Session) GetInventoryContext(steamID string) (*SteamInventoryCont
 	var invContext SteamInventoryContext
 	if err := json.Unmarshal([]byte(match[1]), &invContext); err != nil {
 		return nil, fmt.Errorf("failed to unmarshal json, err %v", err)
-
 	}
 
 	return &invContext, nil
