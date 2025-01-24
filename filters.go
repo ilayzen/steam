@@ -5,11 +5,11 @@ package steam
 type Filter func(*InventoryItem) bool
 
 // IsTradable return Filter for item.Tradable option
-func IsTradable(cond bool) Filter {
-	return func(item *InventoryItem) bool {
-		return item.Desc.Tradable == cond
-	}
-}
+//func IsTradable(cond bool) Filter {
+//	return func(item *InventoryItem) bool {
+//		return item.Desc.Tradable == cond
+//	}
+//}
 
 // IsSouvenir filters souvenir items
 func IsSouvenir(cond bool) Filter {

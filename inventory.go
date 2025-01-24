@@ -27,7 +27,7 @@ type ItemTag struct {
 // Due to the JSON being string, etc... we cannot re-use EconItem
 // Also, "assetid" is included as "id" not as assetid.
 type InventoryItem struct {
-	AppID      uint32        `json:"appid"`
+	AppID      uint64        `json:"appid"`
 	ContextID  uint64        `json:"contextid"`
 	AssetID    uint64        `json:"id,string,omitempty"`
 	ClassID    uint64        `json:"classid,string,omitempty"`
@@ -170,12 +170,8 @@ func (session *Session) fetchInventory(
 	return hasMore, lastAssetID, nil
 }
 
-func (session *Session) GetInventory(sid SteamID, appID, contextID uint64, tradableOnly bool) ([]InventoryItem, error) {
+func (session *Session) GetInventory(sid SteamID, appID, contextID uint64) ([]InventoryItem, error) {
 	filters := []Filter{}
-
-	if tradableOnly {
-		filters = append(filters, IsTradable(tradableOnly))
-	}
 
 	return session.GetFilterableInventory(sid, appID, contextID, filters)
 }
