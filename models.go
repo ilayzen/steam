@@ -161,3 +161,15 @@ type SteamMarketItems struct {
 	SearchData SearchData   `json:"searchdata"`
 	MarketItem []MarketItem `json:"results"`
 }
+
+type SteamTimeResponse struct {
+	SteamTime *SteamTime `json:"response"`
+}
+
+type SteamTime struct {
+	ServerTime                        int64 `json:"server_time,string"`
+	SkewToleranceSeconds              int   `json:"skew_tolerance_seconds,string"`
+	LargeTimeJink                     int   `json:"large_time_jink,string"`
+	ProbeFrequencySeconds             int   `json:"probe_frequency_seconds"`
+	AdjustedTimeProbeFrequencySeconds int   `json:"adjusted_time_probe_frequency_seconds"`
+}

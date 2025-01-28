@@ -1,6 +1,9 @@
 package steam
 
 import (
+	"crypto/hmac"
+	"crypto/sha1"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,8 +16,12 @@ import (
 )
 
 const (
-	InventoryEndpoint        = "http://steamcommunity.com/inventory/%d/%d/%d?"
-	contextInventoryEndpoint = "profiles/%s/inventory/"
+	InventoryEndpoint           = "http://steamcommunity.com/inventory/%d/%d/%d?"
+	contextInventoryEndpoint    = "profiles/%s/inventory/"
+	steamTimeAPI                = "https://api.steampowered.com/ITwoFactorService/QueryTime/v0001"
+	getConfirmationListEndpoint = SteamcommunityURL + "mobileconf/getlist?p=%s&a=%s&k=%s&t=%s&m=%s&tag=%s"
+
+	conf = "conf"
 )
 
 type ItemTag struct {
@@ -27,7 +34,7 @@ type ItemTag struct {
 // Due to the JSON being string, etc... we cannot re-use EconItem
 // Also, "assetid" is included as "id" not as assetid.
 type InventoryItem struct {
-	AppID      uint64        `json:"appid"`
+	AppID      uint32        `json:"appid"`
 	ContextID  uint64        `json:"contextid"`
 	AssetID    uint64        `json:"id,string,omitempty"`
 	ClassID    uint64        `json:"classid,string,omitempty"`
@@ -262,4 +269,101 @@ func (session *Session) GetInventoryContext(steamID string) (*SteamInventoryCont
 	}
 
 	return &invContext, nil
+}
+
+func generateConfirmationHashForTime(identitySecret string, tag string, timestamp int64) (string, error) {
+	decodedSecret, err := base64.StdEncoding.DecodeString(identitySecret)
+	if err != nil {
+		return "", fmt.Errorf("failed to decode identitySecret: %v", err)
+	}
+
+	if len(tag) > 32 {
+		tag = tag[:32]
+	}
+
+	n2 := 8 + len(tag)
+	data := make([]byte, n2)
+	for i := 7; i >= 0; i-- {
+		data[i] = byte(timestamp & 0xFF)
+		timestamp >>= 8
+	}
+	if tag != "" {
+		copy(data[8:], []byte(tag))
+	}
+
+	h := hmac.New(sha1.New, decodedSecret)
+	h.Write(data)
+	hashedData := h.Sum(nil)
+
+	encodedData := base64.StdEncoding.EncodeToString(hashedData)
+	return url.QueryEscape(encodedData), nil
+}
+
+func (s *Session) FetchConfirmations(identitySecret string) (*ConfirmationResponse, error) {
+	timestamp, err := s.getSteamTime()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Steam time: %w", err)
+	}
+
+	hash, err := generateConfirmationHashForTime(identitySecret, conf, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate confirmation hash: %w", err)
+	}
+
+	steamID := s.GetSteamID()
+
+	confListEndpoint := fmt.Sprintf(getConfirmationListEndpoint, s.deviceID, steamID.ToString(), hash, strconv.FormatInt(timestamp, 10), "react", conf)
+
+	req, err := http.NewRequest(http.MethodGet, confListEndpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %w", err)
+	}
+
+	confirmations := ConfirmationResponse{}
+	if err := json.Unmarshal(body, &confirmations); err != nil {
+		return nil, fmt.Errorf("error parsing response JSON: %w", err)
+	}
+
+	return &confirmations, nil
+}
+
+func (s *Session) getSteamTime() (int64, error) {
+	req, err := http.NewRequest(http.MethodPost, steamTimeAPI, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create request: %v", err)
+	}
+
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return 0, fmt.Errorf("failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return 0, fmt.Errorf("Steam API returned status code %d", resp.StatusCode)
+	}
+
+	var result SteamTimeResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, fmt.Errorf("failed to parse Steam time response: %v", err)
+	}
+
+	return result.SteamTime.ServerTime, nil
 }
