@@ -173,3 +173,7 @@ type SteamTime struct {
 	ProbeFrequencySeconds             int   `json:"probe_frequency_seconds"`
 	AdjustedTimeProbeFrequencySeconds int   `json:"adjusted_time_probe_frequency_seconds"`
 }
+
+type ConfirmationAcceptResponse struct {
+	Success bool `json:"success"`
+}

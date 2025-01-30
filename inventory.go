@@ -20,8 +20,8 @@ const (
 	contextInventoryEndpoint    = "profiles/%s/inventory/"
 	steamTimeAPI                = "https://api.steampowered.com/ITwoFactorService/QueryTime/v0001"
 	getConfirmationListEndpoint = SteamcommunityURL + "mobileconf/getlist?p=%s&a=%s&k=%s&t=%s&m=%s&tag=%s"
-
-	conf = "conf"
+	acceptConfirmation          = SteamcommunityURL + "mobileconf/ajaxop?op=%s&p=%s&a=%s&k=%s&t=%s&m=react&tag=%s&cid=%s&ck=%s"
+	conf                        = "conf"
 )
 
 type ItemTag struct {
@@ -286,6 +286,7 @@ func generateConfirmationHashForTime(identitySecret string, tag string, timestam
 	for i := 7; i >= 0; i-- {
 		data[i] = byte(timestamp & 0xFF)
 		timestamp >>= 8
+
 	}
 	if tag != "" {
 		copy(data[8:], []byte(tag))
@@ -366,4 +367,93 @@ func (s *Session) getSteamTime() (int64, error) {
 	}
 
 	return result.SteamTime.ServerTime, nil
+}
+
+func (s *Session) AcceptConfirmation(identitySecret string) (*ConfirmationResponse, error) {
+	timestamp, err := s.getSteamTime()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Steam time: %w", err)
+	}
+
+	hash, err := generateConfirmationHashForTime(identitySecret, conf, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate confirmation hash: %w", err)
+	}
+
+	steamID := s.GetSteamID()
+
+	confListEndpoint := fmt.Sprintf(getConfirmationListEndpoint, s.deviceID, steamID.ToString(), hash, strconv.FormatInt(timestamp, 10), "react", conf)
+
+	req, err := http.NewRequest(http.MethodGet, confListEndpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response: %w", err)
+	}
+
+	confirmations := ConfirmationResponse{}
+	if err := json.Unmarshal(body, &confirmations); err != nil {
+		return nil, fmt.Errorf("error parsing response JSON: %w", err)
+	}
+
+	return &confirmations, nil
+}
+
+func (s *Session) SendConfirmationAjax(conf *Confirmation, tag, is string) (*ConfirmationAcceptResponse, error) {
+	//tag can be only reject or accept
+	op := "cancel"
+	if tag == "accept" {
+		op = "allow"
+	}
+
+	timestamp, err := s.getSteamTime()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Steam time: %w", err)
+	}
+
+	hash, err := generateConfirmationHashForTime(is, tag, timestamp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate confirmation hash: %w", err)
+	}
+
+	steamID := s.GetSteamID()
+
+	confListEndpoint := fmt.Sprintf(acceptConfirmation, op, s.deviceID, steamID.ToString(), hash, strconv.FormatInt(timestamp, 10), tag, conf.ID, conf.Nonce)
+
+	req, err := http.NewRequest(http.MethodGet, confListEndpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	confAccessResponse := &ConfirmationAcceptResponse{}
+	err = json.Unmarshal(body, confAccessResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	return confAccessResponse, nil
 }
