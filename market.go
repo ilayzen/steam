@@ -18,7 +18,7 @@ const (
 )
 
 const (
-	marketEndpoint         = "%smarket/search/render/?norender=1&start=%d&count=%d"
+	marketEndpoint         = "%smarket/search/render/?norender=1&appid=%d&start=%d&count=%d"
 	myListingItemsEndpoint = "%s/market/mylistings?start=%d&count=%d&norender=1"
 )
 
@@ -442,21 +442,31 @@ func (session *Session) GetMyListingsItems(start, perPage uint64) (*ListingItem,
 	return &listingItems, nil
 }
 
-func (s *Session) GetMarketItems(start, perPage uint64) (*SteamMarketItems, error) {
-	if s.client == nil {
-		return nil, fmt.Errorf("HTTP client is not initialized")
-	}
+func (s *Session) GetMarketItems(appid, start, perPage uint64) (*SteamMarketItems, error) {
+	client := http.Client{}
+	endpoint := fmt.Sprintf(marketEndpoint, SteamcommunityURL, appid, start, perPage)
 
-	url := fmt.Sprintf(marketEndpoint, SteamcommunityURL, start, perPage)
-	req, err := http.NewRequest(http.MethodGet, url, nil)
+	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
-	resp, err := s.client.Do(req)
+	parsedURL, err := url.Parse(SteamcommunityURL)
 	if err != nil {
-		return nil, fmt.Errorf("request execution failed: %w", err)
+		return nil, err
 	}
+
+	for _, v := range s.client.Jar.Cookies(parsedURL) {
+		if v.Name == "steamLoginSecure" {
+			req.Header.Set("Cookie", v.String())
+		}
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
